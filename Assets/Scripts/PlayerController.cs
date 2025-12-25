@@ -24,6 +24,18 @@ public class PlayerController : MonoBehaviour
         {
             rb.constraints = RigidbodyConstraints.FreezeRotation;
         }
+
+        // Programmatic Physics Fix: Create Zero Friction material to prevent wall sticking
+        CapsuleCollider col = GetComponent<CapsuleCollider>();
+        if (col != null)
+        {
+            PhysicMaterial zeroFrictionMat = new PhysicMaterial("ZeroFriction");
+            zeroFrictionMat.dynamicFriction = 0f;
+            zeroFrictionMat.staticFriction = 0f;
+            zeroFrictionMat.frictionCombine = PhysicMaterialCombine.Minimum;
+            zeroFrictionMat.bounceCombine = PhysicMaterialCombine.Minimum;
+            col.material = zeroFrictionMat;
+        }
     }
 
     void Update()
