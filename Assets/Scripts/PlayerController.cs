@@ -29,11 +29,11 @@ public class PlayerController : MonoBehaviour
         CapsuleCollider col = GetComponent<CapsuleCollider>();
         if (col != null)
         {
-            PhysicMaterial zeroFrictionMat = new PhysicMaterial("ZeroFriction");
+            PhysicsMaterial zeroFrictionMat = new PhysicsMaterial("ZeroFriction");
             zeroFrictionMat.dynamicFriction = 0f;
             zeroFrictionMat.staticFriction = 0f;
-            zeroFrictionMat.frictionCombine = PhysicMaterialCombine.Minimum;
-            zeroFrictionMat.bounceCombine = PhysicMaterialCombine.Minimum;
+            zeroFrictionMat.frictionCombine = PhysicsMaterialCombine.Minimum;
+            zeroFrictionMat.bounceCombine = PhysicsMaterialCombine.Minimum;
             col.material = zeroFrictionMat;
         }
     }
