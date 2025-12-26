@@ -53,8 +53,8 @@ public class PlayerController : MonoBehaviour
     {
         if (rb == null) return;
 
-        float moveX = Input.GetAxis("Horizontal"); // A/D or Left/Right
-        float moveZ = Input.GetAxis("Vertical");   // W/S or Up/Down
+        float moveX = Input.GetAxisRaw("Horizontal"); // A/D or Left/Right
+        float moveZ = Input.GetAxisRaw("Vertical");   // W/S or Up/Down
 
         // Get camera forward/right vectors but flatten Y to avoid flying/digging into ground
         if (Camera.main != null)

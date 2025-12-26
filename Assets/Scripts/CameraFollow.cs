@@ -23,6 +23,7 @@ public class CameraFollow : MonoBehaviour
         if (target == null)
         {
             GameObject player = GameObject.Find("Capsule");
+            if (player == null) player = GameObject.Find("Character"); // Fallback name
             if (player != null) target = player.transform;
         }
 
