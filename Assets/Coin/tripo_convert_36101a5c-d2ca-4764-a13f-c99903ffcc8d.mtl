@@ -1,0 +1,16 @@
+# Blender 4.5.0 MTL File: 'None'
+# www.blender.org
+
+newmtl tripo_mat_36101a5c-d2ca-4764-a13f-c99903ffcc8d
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd goldcoin3dmodel_basecolor.JPEG
+map_Ns goldcoin3dmodel_roughness.JPEG
+map_Pr goldcoin3dmodel_roughness.JPEG
+map_refl goldcoin3dmodel_metallic.JPEG
+map_Pm goldcoin3dmodel_metallic.JPEG
+map_Bump -bm 1.000000 goldcoin3dmodel_normal.JPEG
