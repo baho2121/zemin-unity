@@ -17,26 +17,27 @@ public class PetFollower : MonoBehaviour
 
     void Start()
     {
-        // Randomize jump phase slightly so they don't all jump in perfect unison if you have many
+        // Randomize jump phase
         jumpPhase = Random.Range(0f, 10f);
         
-        // If player is not assigned, try to find it automatically
+        // Find player if null
         if (player == null)
         {
             GameObject playerObj = GameObject.FindWithTag("Player");
-            if (playerObj != null)
-            {
-                player = playerObj.transform;
-            }
+            if (playerObj != null) player = playerObj.transform;
         }
         
-        // Auto register with manager
+        // Register
         if (PetManager.Instance != null)
             PetManager.Instance.RegisterPet(this);
             
-        // Disable collider to prevent physics issues
+        // Disable collider to prevent physics issues (We use custom raycast now)
         Collider col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
+        
+        // Clean up Rigidbody if added by mistake
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null) Destroy(rb);
     }
 
     // State
@@ -44,35 +45,21 @@ public class PetFollower : MonoBehaviour
     private bool isAttacking = false;
     private float attackTimer;
     public float damage = 10f;
-    public float attackRate = 1.0f; // Seconds between hits
+    public float attackRate = 1.0f; 
 
-    // Removed Duplicate Start Method
-    
-    // Auto-indexing system
     public static System.Collections.Generic.List<PetFollower> allPets = new System.Collections.Generic.List<PetFollower>();
 
-    void OnEnable()
-    {
-        if (!allPets.Contains(this)) allPets.Add(this);
-    }
-    
-    void OnDisable()
-    {
-        if (allPets.Contains(this)) allPets.Remove(this);
-    }
-
+    void OnEnable() { if (!allPets.Contains(this)) allPets.Add(this); }
+    void OnDisable() { if (allPets.Contains(this)) allPets.Remove(this); }
     void OnDestroy()
     {
-        if (PetManager.Instance != null)
-            PetManager.Instance.UnregisterPet(this);
+        if (PetManager.Instance != null) PetManager.Instance.UnregisterPet(this);
     }
 
     public void SetTarget(BreakableObject target)
     {
         currentTarget = target;
         isAttacking = (target != null);
-        
-        // Random jump to start attack animation
         jumpPhase = Random.Range(0f, 10f);
     }
 
@@ -84,12 +71,7 @@ public class PetFollower : MonoBehaviour
         }
         else
         {
-            // Reset if target died
-            if (isAttacking && currentTarget == null)
-            {
-                isAttacking = false;
-            }
-            
+            if (isAttacking && currentTarget == null) isAttacking = false;
             HandleFollowLogic();
         }
     }
@@ -97,45 +79,34 @@ public class PetFollower : MonoBehaviour
     void HandleAttackLogic()
     {
         // Circular Attack Formation
-        float attackRadius = 1.5f; // Radius of the circle around the coin
-        
-        // Calculate angle based on index (distribute evenly)
+        float attackRadius = 1.5f; 
         float angle = ((float)petIndex / Mathf.Max(totalPets, 1)) * Mathf.PI * 2f;
-        
         Vector3 direction = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle));
         Vector3 targetPos = currentTarget.transform.position + (direction * attackRadius);
         
-        // Ground the target pos just in case
-        // targetPos.y = currentTarget.transform.position.y; // Keep same height as coin? Or ground?
-        // Better: Keep pet's Y logic separate (bounce)
-
         float dist = Vector3.Distance(new Vector3(transform.position.x, 0, transform.position.z), new Vector3(targetPos.x, 0, targetPos.z));
-        float stopDistance = 0.5f; // How close to the "slot" should they get?
+        float stopDistance = 0.5f;
 
         if (dist > stopDistance)
         {
-            // Move fast to assigned slot
             Vector3 movePos = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * followSpeed * 2f);
-            transform.position = new Vector3(movePos.x, transform.position.y, movePos.z);
             
-            // Look at the COIN, not the slot
+            // Adjust height to match coin/ground
+            float groundY = GetGroundHeight(movePos);
+            transform.position = new Vector3(movePos.x, groundY + baseHeight, movePos.z);
+            
             transform.LookAt(currentTarget.transform.position);
-            
-            // Running animation height (baseHeight)
-             transform.position = new Vector3(transform.position.x, baseHeight, transform.position.z);
         }
         else
         {
-            // We are in position, Attack!
-            // Bounce animation aggressive
+            // Bounce
             jumpPhase += Time.deltaTime * jumpSpeed * 2f;
             float bounceTitle = Mathf.Abs(Mathf.Sin(jumpPhase)) * 0.5f; 
             
-            // Stay in slot but bounce Y
-            transform.position = new Vector3(targetPos.x, baseHeight + bounceTitle, targetPos.z);
+            float groundY = GetGroundHeight(targetPos);
+            transform.position = new Vector3(targetPos.x, groundY + baseHeight + bounceTitle, targetPos.z);
             transform.LookAt(currentTarget.transform.position);
 
-            // Deal Damage
             attackTimer += Time.deltaTime;
             if (attackTimer >= attackRate)
             {
@@ -149,24 +120,21 @@ public class PetFollower : MonoBehaviour
     {
         if (player == null) return;
 
-        // Auto-update index based on list position
         petIndex = allPets.IndexOf(this);
         totalPets = allPets.Count;
 
-        // 1. TARGET CALCULATION (Grid/U-Formation)
+        // 1. TARGET CALCULATION
         int maxPetsPerRow = 5;
-        float spacing = 1.3f;      // Horizontal distance
-        float rowDepth = 1.5f;     // Vertical distance between rows
-        float curveBias = 0.5f;    // How much it curves back (U-shape)
+        float spacing = 1.3f;      
+        float rowDepth = 1.5f;     
+        float curveBias = 0.5f;    
 
         int rowIndex = petIndex / maxPetsPerRow;
         int indexInRow = petIndex % maxPetsPerRow;
-        
-        int petsInFullRows = (totalPets / maxPetsPerRow) * maxPetsPerRow;
         int petsInThisRow = maxPetsPerRow;
         
         int totalRows = Mathf.CeilToInt((float)totalPets / maxPetsPerRow);
-        if (rowIndex == totalRows - 1) // Is last row?
+        if (rowIndex == totalRows - 1)
         {
              int remainder = totalPets % maxPetsPerRow;
              if (remainder > 0) petsInThisRow = remainder;
@@ -174,22 +142,17 @@ public class PetFollower : MonoBehaviour
 
         float rowCenterOffset = (petsInThisRow - 1) * 0.5f;
         float lateralOffset = (indexInRow - rowCenterOffset) * spacing;
-        
-        // Base depth behind player
         float startDepth = 3.5f; 
-        
-        // Calculate U-Curve
         float extraDepthCurve = Mathf.Abs(lateralOffset) * curveBias;
-        
-        // Invert the curve
         float depthOffset = startDepth + (rowIndex * rowDepth) - extraDepthCurve;
 
-        // Calculate world position
         Vector3 targetPos = player.position 
                             - (player.forward * depthOffset) 
                             + (player.right * lateralOffset);
 
-        targetPos.y = 0f; // Ground level
+        // FIX: Don't force y=0. Find actual ground info.
+        float groundY = GetGroundHeight(targetPos);
+        targetPos.y = groundY;
 
         // 2. SMOOTH FOLLOW
         Vector3 currentPos = transform.position;
@@ -199,10 +162,26 @@ public class PetFollower : MonoBehaviour
 
         // 3. JUMP ANIMATION
         jumpPhase += Time.deltaTime * jumpSpeed;
-        float newY = baseHeight + Mathf.Abs(Mathf.Sin(jumpPhase + (petIndex * 0.5f))) * jumpHeight;
+        float newY = groundY + baseHeight + Mathf.Abs(Mathf.Sin(jumpPhase + (petIndex * 0.5f))) * jumpHeight;
+        
         transform.position = new Vector3(transform.position.x, newY, transform.position.z);
 
         // 4. LOOK AT PLAYER
         transform.LookAt(new Vector3(player.position.x, transform.position.y, player.position.z));
+    }
+
+    // Helper to find ground height
+    float GetGroundHeight(Vector3 pos)
+    {
+        // Raycast from high up downwards
+        RaycastHit hit;
+        // Start from player height or high enough (e.g., +5 units from pos.y)
+        // If we want to be safe for stairs, cast from a bit above the target position estimate
+        if (Physics.Raycast(new Vector3(pos.x, pos.y + 5f, pos.z), Vector3.down, out hit, 10f))
+        {
+            return hit.point.y;
+        }
+        // Fallback: use player's Y or 0
+        return (player != null) ? player.position.y : 0f;
     }
 }

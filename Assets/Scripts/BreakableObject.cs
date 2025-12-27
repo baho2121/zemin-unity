@@ -8,7 +8,8 @@ public class BreakableObject : MonoBehaviour
     public int coinReward = 10;
 
     [Header("Visuals")]
-    public GameObject deathEffect; // Particle to spawn on death
+    public GameObject deathEffect; 
+    public GameObject damageTextPrefab; // Assign an empty object with FloatingText on it, or we create simple ones
 
     private Vector3 initialScale;
 
@@ -28,6 +29,9 @@ public class BreakableObject : MonoBehaviour
     {
         currentHealth -= amount;
         
+        // Spawn Damage Text
+        ShowDamageNumber(amount);
+        
         // Simple hit effect: Tiny Punch
         transform.localScale = initialScale * 0.8f; 
         
@@ -35,6 +39,16 @@ public class BreakableObject : MonoBehaviour
         {
             Die();
         }
+    }
+    
+    void ShowDamageNumber(float amount)
+    {
+        // Simple Instantiation
+        GameObject popup = new GameObject("DamagePopup");
+        popup.transform.position = transform.position + Vector3.up * 1.5f; // Spawn above coin
+        
+        FloatingText ft = popup.AddComponent<FloatingText>();
+        ft.Setup(amount);
     }
 
     void Update()
