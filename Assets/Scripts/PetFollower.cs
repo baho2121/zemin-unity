@@ -29,15 +29,25 @@ public class PetFollower : MonoBehaviour
                 player = playerObj.transform;
             }
         }
-
-        // Fix: Disable collider to prevent pushing the player
+        
+        // Auto register with manager
+        if (PetManager.Instance != null)
+            PetManager.Instance.RegisterPet(this);
+            
+        // Disable collider to prevent physics issues
         Collider col = GetComponent<Collider>();
-        if (col != null)
-        {
-            col.enabled = false;
-        }
+        if (col != null) col.enabled = false;
     }
 
+    // State
+    private BreakableObject currentTarget;
+    private bool isAttacking = false;
+    private float attackTimer;
+    public float damage = 10f;
+    public float attackRate = 1.0f; // Seconds between hits
+
+    // Removed Duplicate Start Method
+    
     // Auto-indexing system
     public static System.Collections.Generic.List<PetFollower> allPets = new System.Collections.Generic.List<PetFollower>();
 
@@ -45,13 +55,97 @@ public class PetFollower : MonoBehaviour
     {
         if (!allPets.Contains(this)) allPets.Add(this);
     }
-
+    
     void OnDisable()
     {
         if (allPets.Contains(this)) allPets.Remove(this);
     }
 
+    void OnDestroy()
+    {
+        if (PetManager.Instance != null)
+            PetManager.Instance.UnregisterPet(this);
+    }
+
+    public void SetTarget(BreakableObject target)
+    {
+        currentTarget = target;
+        isAttacking = (target != null);
+        
+        // Random jump to start attack animation
+        jumpPhase = Random.Range(0f, 10f);
+    }
+
     void Update()
+    {
+        if (isAttacking && currentTarget != null)
+        {
+            HandleAttackLogic();
+        }
+        else
+        {
+            // Reset if target died
+            if (isAttacking && currentTarget == null)
+            {
+                isAttacking = false;
+            }
+            
+            HandleFollowLogic();
+        }
+    }
+
+    void HandleAttackLogic()
+    {
+        // Circular Attack Formation
+        float attackRadius = 1.5f; // Radius of the circle around the coin
+        
+        // Calculate angle based on index (distribute evenly)
+        float angle = ((float)petIndex / Mathf.Max(totalPets, 1)) * Mathf.PI * 2f;
+        
+        Vector3 direction = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle));
+        Vector3 targetPos = currentTarget.transform.position + (direction * attackRadius);
+        
+        // Ground the target pos just in case
+        // targetPos.y = currentTarget.transform.position.y; // Keep same height as coin? Or ground?
+        // Better: Keep pet's Y logic separate (bounce)
+
+        float dist = Vector3.Distance(new Vector3(transform.position.x, 0, transform.position.z), new Vector3(targetPos.x, 0, targetPos.z));
+        float stopDistance = 0.5f; // How close to the "slot" should they get?
+
+        if (dist > stopDistance)
+        {
+            // Move fast to assigned slot
+            Vector3 movePos = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * followSpeed * 2f);
+            transform.position = new Vector3(movePos.x, transform.position.y, movePos.z);
+            
+            // Look at the COIN, not the slot
+            transform.LookAt(currentTarget.transform.position);
+            
+            // Running animation height (baseHeight)
+             transform.position = new Vector3(transform.position.x, baseHeight, transform.position.z);
+        }
+        else
+        {
+            // We are in position, Attack!
+            // Bounce animation aggressive
+            jumpPhase += Time.deltaTime * jumpSpeed * 2f;
+            float bounceTitle = Mathf.Abs(Mathf.Sin(jumpPhase)) * 0.5f; 
+            
+            // Stay in slot but bounce Y
+            transform.position = new Vector3(targetPos.x, baseHeight + bounceTitle, targetPos.z);
+            transform.LookAt(currentTarget.transform.position);
+
+            // Deal Damage
+            attackTimer += Time.deltaTime;
+            if (attackTimer >= attackRate)
+            {
+                currentTarget.TakeDamage(damage);
+                attackTimer = 0f;
+            }
+        }
+    }
+
+    void HandleFollowLogic()
     {
         if (player == null) return;
 
@@ -59,7 +153,7 @@ public class PetFollower : MonoBehaviour
         petIndex = allPets.IndexOf(this);
         totalPets = allPets.Count;
 
-        // 1. TARGET CALCULATION (Symmetrical V/U Formation)
+        // 1. TARGET CALCULATION (Grid/U-Formation)
         int maxPetsPerRow = 5;
         float spacing = 1.3f;      // Horizontal distance
         float rowDepth = 1.5f;     // Vertical distance between rows
@@ -68,22 +162,9 @@ public class PetFollower : MonoBehaviour
         int rowIndex = petIndex / maxPetsPerRow;
         int indexInRow = petIndex % maxPetsPerRow;
         
-        // Calculate how many pets are in THIS specific row
-        // If total is 7:
-        // Row 0: 5 pets
-        // Row 1: 2 pets
-        // We need to know where 'this' row starts and ends to center it.
-        
         int petsInFullRows = (totalPets / maxPetsPerRow) * maxPetsPerRow;
         int petsInThisRow = maxPetsPerRow;
         
-        // If we are in the last row, count might be less
-        if (rowIndex == totalPets / maxPetsPerRow)
-        {
-            petsInThisRow = totalPets % maxPetsPerRow;
-            if (petsInThisRow == 0) petsInThisRow = maxPetsPerRow; // Full last row case
-        }
-        // Actually simpler:
         int totalRows = Mathf.CeilToInt((float)totalPets / maxPetsPerRow);
         if (rowIndex == totalRows - 1) // Is last row?
         {
@@ -91,43 +172,34 @@ public class PetFollower : MonoBehaviour
              if (remainder > 0) petsInThisRow = remainder;
         }
 
-        // Standard Centering Formula: (i - (N-1)/2)
-        // Example N=4: (0-1.5)=-1.5, (1-1.5)=-0.5, (2-1.5)=0.5, (3-1.5)=1.5 -> Centered!
-        // Example N=3: (0-1)=-1, (1-1)=0, (2-1)=1 -> Centered!
-        
         float rowCenterOffset = (petsInThisRow - 1) * 0.5f;
         float lateralOffset = (indexInRow - rowCenterOffset) * spacing;
         
         // Base depth behind player
-        // For "Ters U" (Inverted U), the sides are CLOSER to the player than the center?
-        // OR the center is further back?
-        // Let's assume standard "Encircle" behavior: Sides come forward (closer to player).
-        float startDepth = 3.5f; // Push start back so sides have room to come forward
+        float startDepth = 3.5f; 
         
         // Calculate U-Curve
         float extraDepthCurve = Mathf.Abs(lateralOffset) * curveBias;
         
-        // Invert the curve: Center is furthest back (relative to the arc), Sides are closer
+        // Invert the curve
         float depthOffset = startDepth + (rowIndex * rowDepth) - extraDepthCurve;
 
-        // Calculate world position relative to player rotation
+        // Calculate world position
         Vector3 targetPos = player.position 
                             - (player.forward * depthOffset) 
                             + (player.right * lateralOffset);
 
         targetPos.y = 0f; // Ground level
 
-        // 2. SMOOTH FOLLOW (Lerp)
+        // 2. SMOOTH FOLLOW
         Vector3 currentPos = transform.position;
         Vector3 smoothPos = Vector3.Lerp(currentPos, targetPos, Time.deltaTime * followSpeed);
         
-        // Keep X and Z smoothed
         transform.position = new Vector3(smoothPos.x, transform.position.y, smoothPos.z);
 
-        // 3. JUMP ANIMATION (Sine Wave)
+        // 3. JUMP ANIMATION
         jumpPhase += Time.deltaTime * jumpSpeed;
-        
-        float newY = baseHeight + Mathf.Abs(Mathf.Sin(jumpPhase + (petIndex * 0.5f))) * jumpHeight; // Offset jump phase by index for wave effect
+        float newY = baseHeight + Mathf.Abs(Mathf.Sin(jumpPhase + (petIndex * 0.5f))) * jumpHeight;
         transform.position = new Vector3(transform.position.x, newY, transform.position.z);
 
         // 4. LOOK AT PLAYER

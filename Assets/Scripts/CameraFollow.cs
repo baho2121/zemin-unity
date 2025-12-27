@@ -32,20 +32,34 @@ public class CameraFollow : MonoBehaviour
         currentX = angles.y;
         currentY = angles.x;
 
-        // Lock cursor for TPS feel
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        // Lock cursor for TPS feel? 
+        // NO: We need cursor for clicking coins. 
+        // Change: Only lock when holding Right Click (Roblox style)
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
     }
 
     void LateUpdate()
     {
         if (target == null) return;
 
-        // Mouse Input
-        currentX += Input.GetAxis("Mouse X") * sensitivityX;
-        currentY -= Input.GetAxis("Mouse Y") * sensitivityY;
+        // Camera Rotation (Only when Right Click is held)
+        if (Input.GetMouseButton(1))
+        {
+            // Lock cursor while dragging
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
 
-        currentY = Mathf.Clamp(currentY, minVerticalAngle, maxVerticalAngle);
+            currentX += Input.GetAxis("Mouse X") * sensitivityX;
+            currentY -= Input.GetAxis("Mouse Y") * sensitivityY;
+            currentY = Mathf.Clamp(currentY, minVerticalAngle, maxVerticalAngle);
+        }
+        else
+        {
+            // Unlock cursor when not dragging
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
 
         // Zoom Input
         float scroll = Input.GetAxis("Mouse ScrollWheel");
